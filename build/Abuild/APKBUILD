@@ -1,0 +1,155 @@
+# Alpine-Contributor: Carlo Landmeter <clandmeter@alpinelinux.org>
+# Alpine-Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Alpine-Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Felix Xing <fxing@qnx.com>
+pkgname=ruby
+pkgver=3.4.7
+_abiver="${pkgver%.*}.0"
+pkgrel=3
+pkgdesc="An object-oriented language for quick and easy programming"
+url="https://www.ruby-lang.org/"
+arch="all"
+license="Ruby AND BSD-2-Clause AND MIT"
+depends="ca-certificates gmp qnx-io-sock $pkgname-libs=$pkgver-r$pkgrel"
+depends_dev="
+    $pkgname=$pkgver-r$pkgrel
+    $pkgname-rdoc=$pkgver-r$pkgrel
+    gmp-dev
+    qnx-io-sock-dev
+    "
+makedepends="$depends_dev
+    autoconf
+    gdbm-dev
+    libxcrypt-dev
+    libffi-dev
+    openssl-dev
+    readline-dev
+    ncurses-dev
+    yaml-dev
+    zlib-dev
+    clang
+    libc++-dev
+    "
+subpackages="$pkgname-dbg $pkgname-doc $pkgname-dev
+    $pkgname-rdoc::noarch $pkgname-libs
+    "
+source="https://cache.ruby-lang.org/pub/ruby/${pkgver%.*}/ruby-$pkgver.tar.gz
+        make-compatible-with-qnx8.patch
+    "
+options="!check" # Fail at the beginning
+
+_gemdir="usr/lib/ruby/gems/$_abiver"
+_rubydir="usr/lib/ruby/$_abiver"
+
+prepare() {
+    default_prepare
+    autoconf -fiv
+}
+
+build() {
+    export CFLAGS="${CFLAGS/-Os/-O2} -O2 -Qunused-arguments -Wno-default-const-init-field-unsafe"
+    export CPPFLAGS="${CPPFLAGS/-Os/-O2} -O2 -Qunused-arguments"
+    export LDFLAGS="$LDFLAGS -Wl,-z,execstack -Wl,-z,stack-size=8388608"
+
+    # ruby saves path to install. we want use $PATH
+    export INSTALL=install
+
+    # the configure script does not detect isnan/isinf as macros
+    export ac_cv_func_isnan=yes
+    export ac_cv_func_isinf=yes
+    export ac_cv_func_malloc_trim=no
+    export ac_cv_func_openat=no # prevent O_DIRECTORY
+    export rb_cv_tls_specifier=none # 803 TLS bug
+
+    # Use clang because gcc is very unstable
+    export CC="clang"
+    export CXX="clang++"
+
+    if [[ $CARCH == "x86_64" ]]; then
+        _coroutine="amd64"
+    elif [[ $CARCH == "aarch64" ]]; then
+        _coroutine="arm64"
+    else
+        die "$CARCH not supported"
+    fi
+
+    ./configure \
+        --build=$CBUILD \
+        --host=$CHOST \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --mandir=/usr/share/man \
+        --infodir=/usr/share/info \
+        --with-sitedir=/usr/local/lib/site_ruby \
+        --enable-pthread \
+        --disable-rpath \
+        --enable-shared \
+        --with-mantype=man \
+        --with-coroutine=$_coroutine \
+        --without-baseruby \
+        --with-static-linked-ext \
+        --disable-fortify-source \
+
+    make
+}
+
+check() {
+    make test TESTOPTS="--verbose" || true
+}
+
+package() {
+    make DESTDIR="$pkgdir" SUDO="" install
+
+    install -m 644 -D COPYING "$pkgdir"/usr/share/licenses/$pkgname/COPYING
+
+    cd "$pkgdir"
+
+    # Remove bundled CA certificates; they are provided by ca-certificates.
+    rm ./$_rubydir/rubygems/ssl_certs/*/*.pem
+    rmdir ./$_rubydir/rubygems/ssl_certs/* || true
+
+    rm -Rf ./$_gemdir/cache/*
+
+    if [ -d usr/local ]; then
+        local f=$(find usr/local -type f)
+        if [ -n "$f" ]; then
+            error "Found files in /usr/local:"
+            echo "$f"
+            return 1
+        fi
+        rm -r usr/local
+    fi
+}
+
+rdoc() {
+    pkgdesc="Ruby documentation tool"
+    license="Ruby"
+    depends="$pkgname"
+
+    amove $_rubydir/rdoc
+    amove $_gemdir/gems/rdoc-*
+    amove $_gemdir/specifications/default/rdoc-*
+    amove usr/bin/ri
+    amove usr/bin/rdoc
+}
+
+libs() {
+    pkgdesc="Libraries necessary to run Ruby"
+    depends="libffi
+            qnx-io-sock
+            gdbm
+            yaml
+            readline
+            ncurses
+            zlib
+            libssl3
+            libcrypto3
+            libxcrypt"
+
+    amove usr/lib
+}
+
+sha512sums="
+7c9b807aa794a19377b0048da0e94869bf57905cf68d4f30b959aefb9f67834a51e06a23c9eee858e7f90938dbc38a5072bc946df502a6bcf86bf198ae061e22  ruby-3.4.7.tar.gz
+371dc628eef3791fa9c3e0e7ae1fec836abdab267c4b2e3562afdc8fbe394055255942e16f6083bb59eb6e122804565eb5b88858faa1f155200adecaf935a4af  make-compatible-with-qnx8.patch
+"

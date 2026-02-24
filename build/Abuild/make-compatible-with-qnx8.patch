@@ -1,0 +1,58 @@
+diff --git a/ext/socket/ancdata.c b/ext/socket/ancdata.c
+index f1e9e42..b87dce3 100644
+--- a/ext/socket/ancdata.c
++++ b/ext/socket/ancdata.c
+@@ -2,6 +2,13 @@
+ 
+ #include <time.h>
+ 
++#ifdef __QNX__
++struct bintime {
++       time_t  sec;
++       uint64_t frac;
++};
++#endif
++
+ static VALUE sym_wait_readable, sym_wait_writable;
+ 
+ #if defined(HAVE_STRUCT_MSGHDR_MSG_CONTROL)
+diff --git a/io.c b/io.c
+index f85cab5..f0a6568 100644
+--- a/io.c
++++ b/io.c
+@@ -58,6 +58,7 @@
+ 
+ #ifdef __QNXNTO__
+ #include <unix.h>
++#define setmode(a, b)
+ #endif
+ 
+ #include <sys/types.h>
+diff --git a/thread.c b/thread.c
+index 7b7d38e..aba87ae 100644
+--- a/thread.c
++++ b/thread.c
+@@ -104,6 +104,10 @@
+ #include <sys/wait.h>
+ #endif
+ 
++#ifdef __QNX__
++#define howmany(A, B)  ((A)/(B) + 1)
++#endif
++
+ #ifndef USE_NATIVE_THREAD_PRIORITY
+ #define USE_NATIVE_THREAD_PRIORITY 0
+ #define RUBY_THREAD_PRIORITY_MAX 3
+diff --git a/vm_core.h b/vm_core.h
+index 961cc39..f53b34d 100644
+--- a/vm_core.h
++++ b/vm_core.h
+@@ -145,8 +145,6 @@ extern int ruby_assert_critical_section_entered;
+ #elif defined(_SIG_MAXSIG)      /* FreeBSD */
+ # undef NSIG
+ # define NSIG _SIG_MAXSIG
+-#elif defined(_SIGMAX)          /* QNX */
+-# define NSIG (_SIGMAX + 1)
+ #elif defined(NSIG)             /* 99% of everything else */
+ # /* take it */
+ #else                           /* Last resort */

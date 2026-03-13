@@ -5,7 +5,7 @@
 pkgname=ruby
 pkgver=3.4.7
 _abiver="${pkgver%.*}.0"
-pkgrel=3
+pkgrel=${pkgrel:-0}
 pkgdesc="An object-oriented language for quick and easy programming"
 url="https://www.ruby-lang.org/"
 arch="all"
@@ -149,6 +149,7 @@ libs() {
     amove usr/lib
 }
 
+options="$options ${DISABLE_CHECK:+!check}"
 sha512sums="
 7c9b807aa794a19377b0048da0e94869bf57905cf68d4f30b959aefb9f67834a51e06a23c9eee858e7f90938dbc38a5072bc946df502a6bcf86bf198ae061e22  ruby-3.4.7.tar.gz
 371dc628eef3791fa9c3e0e7ae1fec836abdab267c4b2e3562afdc8fbe394055255942e16f6083bb59eb6e122804565eb5b88858faa1f155200adecaf935a4af  make-compatible-with-qnx8.patch
